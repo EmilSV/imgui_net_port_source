@@ -51,6 +51,34 @@ function Copy-RelativeFile {
 	Copy-Item -LiteralPath $sourcePath -Destination $destinationPath -Force
 }
 
+function Update-DeprecatedEmscriptenMacros {
+	param(
+		[Parameter(Mandatory = $true)]
+		[string]$RootPath
+	)
+
+	$replacements = @{
+		'__EMSCRIPTEN_major__' = '__EMSCRIPTEN_MAJOR__'
+		'__EMSCRIPTEN_minor__' = '__EMSCRIPTEN_MINOR__'
+		'__EMSCRIPTEN_tiny__' = '__EMSCRIPTEN_TINY__'
+	}
+
+	Get-ChildItem -Path $RootPath -Recurse -File | Where-Object {
+		$_.Extension -in '.c', '.cpp', '.h'
+	} | ForEach-Object {
+		$content = Get-Content -LiteralPath $_.FullName -Raw
+		$updatedContent = $content
+
+		foreach ($oldValue in $replacements.Keys) {
+			$updatedContent = $updatedContent.Replace($oldValue, $replacements[$oldValue])
+		}
+
+		if ($updatedContent -cne $content) {
+			Set-Content -LiteralPath $_.FullName -Value $updatedContent -Encoding ascii
+		}
+	}
+}
+
 function Get-ConfigValue {
 	param(
 		[Parameter(Mandatory = $true)]
@@ -174,6 +202,8 @@ try {
 	foreach ($relativePath in $filesToCopy) {
 		Copy-RelativeFile -SourceRoot $cloneRoot -DestinationRoot $packageRoot -RelativePath $relativePath -Optional:($relativePath -eq 'cimgui/imgui/imgui_tables.cpp')
 	}
+
+	Update-DeprecatedEmscriptenMacros -RootPath $packageRoot
 
 	$sourceCommit = (& git -C $cloneRoot rev-parse HEAD).Trim()
 	if ($LASTEXITCODE -ne 0) {
