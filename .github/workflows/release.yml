@@ -1,0 +1,58 @@
+name: Build And Release Zip
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve release metadata
+        id: metadata
+        shell: pwsh
+        run: |
+          $configPath = Join-Path $env:GITHUB_WORKSPACE 'gather_source_files.release.json'
+          $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
+          $outputZipPath = $config.OutputZipPath
+
+          if ([string]::IsNullOrWhiteSpace($outputZipPath)) {
+            $outputZipPath = 'cimgui-source-package.zip'
+          }
+
+          if (-not [System.IO.Path]::IsPathRooted($outputZipPath)) {
+            $outputZipPath = Join-Path $env:GITHUB_WORKSPACE $outputZipPath
+          }
+
+          $resolvedZipPath = [System.IO.Path]::GetFullPath($outputZipPath)
+          $shortSha = $env:GITHUB_SHA.Substring(0, 7)
+          $tagName = "main-$shortSha"
+
+          "zip_path=$resolvedZipPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "tag_name=$tagName" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "release_name=main build $shortSha" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Build source zip
+        shell: pwsh
+        run: .\gather_source_files.ps1 .\gather_source_files.release.json
+
+      - name: Create GitHub release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ steps.metadata.outputs.tag_name }}
+          name: ${{ steps.metadata.outputs.release_name }}
+          artifacts: ${{ steps.metadata.outputs.zip_path }}
+          artifactErrorsFailBuild: true
+          allowUpdates: true
+          replacesArtifacts: true
+          generateReleaseNotes: false
+          body: |
+            Automated release for commit ${{ github.sha }}.
