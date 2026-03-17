@@ -61,6 +61,7 @@ function Update-DeprecatedEmscriptenMacros {
 		'__EMSCRIPTEN_major__' = '__EMSCRIPTEN_MAJOR__'
 		'__EMSCRIPTEN_minor__' = '__EMSCRIPTEN_MINOR__'
 		'__EMSCRIPTEN_tiny__' = '__EMSCRIPTEN_TINY__'
+		'typedef ImU64 ImTextureID;' = 'typedef void* ImTextureID;'
 	}
 
 	Get-ChildItem -Path $RootPath -Recurse -File | Where-Object {
